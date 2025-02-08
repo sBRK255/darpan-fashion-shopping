@@ -34,26 +34,26 @@ DARPAN FASHION SHOPPING is an online fashion store that offers affordable clothi
 
 ## Tech Stack
 - **Frontend**: HTML, CSS, JavaScript
-- **Backend**: Flask (Python)
+- **Backend**: Node.js (Express.js)
 - **Database**: MySQL / PostgreSQL / MongoDB
 - **Authentication**: JWT / Firebase Auth
 - **AI Assistant**: OpenAI API / Custom Chatbot
 
 ## Installation & Setup
 1. Clone the repository:
-   
+   ```bash
    git clone https://github.com/your-repo/darpan-fashion-shopping.git
    cd darpan-fashion-shopping
-   
+   ```
 2. Install dependencies:
- 
-   pip install -r requirements.txt  # For Flask
-  
+   ```bash
+   npm install  # For Node.js
+   ```
 3. Set up environment variables:
    - Create a `.env` file and configure database credentials.
 4. Run the application:
    ```bash
-   flask run
+   npm start
    ```
 
 ## Contribution
@@ -61,5 +61,4 @@ Contributions are welcome! Submit a pull request or open an issue.
 
 ## License
 This project is licensed under the MIT License.
-
 
