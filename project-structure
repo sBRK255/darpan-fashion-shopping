@@ -1,0 +1,19 @@
+darpan-fashion-shopping/
+├── client/
+│   ├── public/
+│   │   ├── index.html
+│   │   └── assets/
+│   └── src/
+│       ├── components/
+│       ├── pages/
+│       ├── styles/
+│       └── utils/
+├── server/
+│   ├── config/
+│   ├── controllers/
+│   ├── models/
+│   ├── routes/
+│   └── middleware/
+├── .env
+├── .gitignore
+└── package.json 

@@ -1,0 +1,17 @@
+.payment-method-card {
+    transition: transform 0.2s ease-in-out;
+}
+
+.payment-method-card:hover {
+    transform: translateY(-4px);
+}
+
+.payment-icon {
+    font-size: 2rem;
+    margin-bottom: 1rem;
+}
+
+.selected-method {
+    border: 2px solid #2196F3;
+    box-shadow: 0 4px 8px rgba(33, 150, 243, 0.2);
+} 
