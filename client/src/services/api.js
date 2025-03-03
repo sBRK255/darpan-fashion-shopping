@@ -1,7 +1,7 @@
 import axios from 'axios';
 
 const API_URL = process.env.NODE_ENV === 'production' 
-    ? '/api'
+    ? 'https://darpan-fashion-shopping-ib7j-4jy6rbtf3.vercel.app/api'
     : 'http://localhost:5000/api';
 
 // Helper function to get auth config
