@@ -1,8 +1,8 @@
 import axios from 'axios';
 
-const API_URL = process.env.NODE_ENV === 'production' 
+const API_URL = process.env.NODE_ENV === 'production'
     ? 'https://darpan-fashion-shopping-ib7j-4jy6rbtf3.vercel.app/api'
-    : 'http://localhost:5000/api';
+    : '/api'; // use CRA proxy in development (client/package.json has proxy: http://localhost:5000)
 
 // Helper function to get auth config
 const getAuthConfig = () => {
@@ -26,7 +26,8 @@ const api = axios.create({
     headers: {
         'Content-Type': 'application/json',
     },
-    withCredentials: true
+    // withCredentials not set by default; enable only if backend uses cookies for auth
+    withCredentials: false
 });
 
 // Add auth token to requests
@@ -85,8 +86,12 @@ export const orderAPI = {
 };
 
 export const paymentAPI = {
-    createZenoPayOrder: (orderId) => api.post(`/payments/zenopay/${orderId}`),
+    createFastLipaOrder: (orderId) => api.post(`/payments/fastlipa/${orderId}`),
+    // Backwards-compatible alias for older code that called createZenoPayOrder
+    createZenoPayOrder: (orderId) => api.post(`/payments/fastlipa/${orderId}`),
     createPesapalOrder: (orderId) => api.post(`/payments/pesapal/${orderId}`),
+    // Poll transaction status
+    getFastLipaStatus: (tranid) => api.get(`/payments/fastlipa/status?tranid=${tranid}`),
 };
 
 export default api; 

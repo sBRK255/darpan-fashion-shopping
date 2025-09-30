@@ -1,5 +1,6 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
+import { useSelector, useDispatch } from 'react-redux';
 import {
     Paper,
     Typography,
@@ -12,8 +13,11 @@ import {
     CardMedia,
     Divider,
     Tooltip,
-    Zoom
+    Zoom,
+    CircularProgress
 } from '@mui/material';
+import { paymentAPI } from '../../services/api';
+import { updateOrderStatus } from '../../slices/orderSlice';
 import {
     Payment as PaymentIcon,
     Security as SecurityIcon,
@@ -25,10 +29,24 @@ import {
 
 const PaymentMethod = () => {
     const navigate = useNavigate();
+    const dispatch = useDispatch();
+    const order = useSelector(state => state.order.order);
+    
     const [selectedMethod, setSelectedMethod] = useState('');
     const [error, setError] = useState('');
+    const [loading, setLoading] = useState(false);
+    const [paymentStatus, setPaymentStatus] = useState(null);
+    const [transactionId, setTransactionId] = useState(null);
 
     const paymentMethods = [
+        {
+            name: 'FastLipa Pay',
+            value: 'fastlipa',
+            logo: '/images/payments/halo-logo.png', // Using default logo, should be updated with FastLipa logo
+            color: '#1976D2',
+            icon: <PaymentIcon />,
+            description: 'Fast and secure payment via FastLipa'
+        },
         {
             name: 'M-PESA',
             value: 'mpesa',
@@ -63,10 +81,69 @@ const PaymentMethod = () => {
         }
     ];
 
-    const handleMethodSelect = (method) => {
+    useEffect(() => {
+        let statusCheckInterval;
+        if (transactionId) {
+            // Check status immediately
+            checkPaymentStatus();
+            // Then check every 5 seconds
+            statusCheckInterval = setInterval(checkPaymentStatus, 5000);
+        }
+        return () => {
+            if (statusCheckInterval) {
+                clearInterval(statusCheckInterval);
+            }
+        };
+    }, [transactionId]);
+
+    const checkPaymentStatus = async () => {
+        try {
+            const response = await paymentAPI.getFastLipaStatus(transactionId);
+            const status = response.data.status;
+            setPaymentStatus(status);
+            
+            if (status === 'COMPLETED') {
+                dispatch(updateOrderStatus({ id: order._id, status: 'paid' }));
+                clearInterval(statusCheckInterval);
+                navigate('/orders/' + order._id);
+            } else if (status === 'FAILED') {
+                setError('Payment failed. Please try again.');
+                setLoading(false);
+                clearInterval(statusCheckInterval);
+            }
+        } catch (err) {
+            console.error('Error checking payment status:', err);
+            setError('Error checking payment status. Please contact support.');
+            setLoading(false);
+        }
+    };
+
+    const handleMethodSelect = async (method) => {
         setSelectedMethod(method);
         localStorage.setItem('paymentMethod', method);
-        navigate('/checkout/review');
+
+        if (method === 'fastlipa') {
+            try {
+                setLoading(true);
+                setError('');
+                
+                // Initiate FastLipa payment
+                const response = await paymentAPI.createFastLipaOrder(order._id);
+                setTransactionId(response.data.transactionId);
+                setPaymentStatus('PENDING');
+                
+                // Open payment URL if provided
+                if (response.data.paymentUrl) {
+                    window.open(response.data.paymentUrl, '_blank');
+                }
+            } catch (err) {
+                console.error('Error initiating payment:', err);
+                setError('Error initiating payment. Please try again.');
+                setLoading(false);
+            }
+        } else {
+            navigate('/checkout/review');
+        }
     };
 
     const features = [
@@ -82,8 +159,8 @@ const PaymentMethod = () => {
         },
         {
             icon: <CheckCircleIcon fontSize="large" color="primary" />,
-            title: 'Verified by ZenoPay',
-            description: 'Official payment partner for secure transactions'
+            title: 'Verified by FastLipa',
+            description: 'Trusted payment partner for secure transactions'
         }
     ];
 
@@ -103,6 +180,23 @@ const PaymentMethod = () => {
                 {error && (
                     <Alert severity="error" sx={{ mb: 3 }}>
                         {error}
+                    </Alert>
+                )}
+
+                {loading && (
+                    <Box sx={{ display: 'flex', justifyContent: 'center', mb: 3 }}>
+                        <CircularProgress />
+                    </Box>
+                )}
+
+                {paymentStatus && (
+                    <Alert 
+                        severity={paymentStatus === 'COMPLETED' ? 'success' : 'info'} 
+                        sx={{ mb: 3 }}
+                    >
+                        {paymentStatus === 'COMPLETED' 
+                            ? 'Payment completed successfully!' 
+                            : `Payment status: ${paymentStatus}. Please complete the payment in the opened window.`}
                     </Alert>
                 )}
 
@@ -209,7 +303,7 @@ const PaymentMethod = () => {
                         Secure Payment Processing
                     </Typography>
                     <Typography variant="body2" color="text.secondary">
-                        Your payment information is securely processed through ZenoPay's 
+                        Your payment information is securely processed through FastLipa's 
                         encrypted payment gateway. We never store your payment details.
                     </Typography>
                 </Box>
