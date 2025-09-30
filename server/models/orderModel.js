@@ -29,7 +29,7 @@ const orderSchema = new mongoose.Schema({
     paymentMethod: {
         type: String,
         required: true,
-        enum: ['mpesa', 'tigopesa', 'airtel', 'halopesa', 'cod']
+        enum: ['mpesa', 'tigopesa', 'airtel', 'halopesa', 'cod', 'fastlipa']
     },
     paymentResult: {
         id: { type: String },

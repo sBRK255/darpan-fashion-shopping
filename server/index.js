@@ -1,6 +1,7 @@
 const express = require('express');
 const cors = require('cors');
 const dotenv = require('dotenv');
+dotenv.config({ path: require('path').resolve(__dirname, '../.env') });
 const connectDB = require('./config/db');
 const userRoutes = require('./routes/userRoutes');
 const productRoutes = require('./routes/productRoutes');
@@ -10,8 +11,7 @@ const adminRoutes = require('./routes/adminRoutes');
 const paymentRoutes = require('./routes/paymentRoutes');
 const mongoose = require('mongoose');
 
-// Load environment variables
-dotenv.config();
+// Environment already loaded above
 
 // Set NODE_ENV if not set
 process.env.NODE_ENV = process.env.NODE_ENV || 'development';

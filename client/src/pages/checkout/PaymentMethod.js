@@ -14,9 +14,16 @@ import {
     Divider,
     Tooltip,
     Zoom,
-    CircularProgress
+    CircularProgress,
+    TextField,
+    Dialog,
+    DialogTitle,
+    DialogContent,
+    DialogActions
 } from '@mui/material';
-import { paymentAPI } from '../../services/api';
+import { paymentAPI, orderAPI } from '../../services/api';
+import { setOrder } from '../../slices/orderSlice';
+import { clearCart } from '../../slices/cartSlice';
 import { updateOrderStatus } from '../../slices/orderSlice';
 import {
     Payment as PaymentIcon,
@@ -30,30 +37,39 @@ import {
 const PaymentMethod = () => {
     const navigate = useNavigate();
     const dispatch = useDispatch();
+    const { items, totalAmount } = useSelector((state) => state.cart);
+    const { userInfo } = useSelector((state) => state.auth);
     const order = useSelector(state => state.order.order);
+    const shippingAddress = JSON.parse(localStorage.getItem('shippingAddress'));
+
+    // Redirect if prerequisites not met
+    useEffect(() => {
+        if (!items?.length) {
+            navigate('/cart');
+        }
+        if (!shippingAddress) {
+            navigate('/checkout/shipping');
+        }
+    }, [items, shippingAddress, navigate]);
     
     const [selectedMethod, setSelectedMethod] = useState('');
     const [error, setError] = useState('');
     const [loading, setLoading] = useState(false);
     const [paymentStatus, setPaymentStatus] = useState(null);
     const [transactionId, setTransactionId] = useState(null);
+    const [phoneNumber, setPhoneNumber] = useState('');
+    const [showPhoneDialog, setShowPhoneDialog] = useState(false);
+    const [phoneError, setPhoneError] = useState('');
 
     const paymentMethods = [
-        {
-            name: 'FastLipa Pay',
-            value: 'fastlipa',
-            logo: '/images/payments/halo-logo.png', // Using default logo, should be updated with FastLipa logo
-            color: '#1976D2',
-            icon: <PaymentIcon />,
-            description: 'Fast and secure payment via FastLipa'
-        },
         {
             name: 'M-PESA',
             value: 'mpesa',
             logo: '/images/payments/mpesa-logo.png',
             color: '#00AE8D',
             icon: <PhoneIcon />,
-            description: 'Pay directly with M-PESA mobile money'
+            description: 'Pay with M-PESA mobile money via FastLipa',
+            network: 'MPESA'
         },
         {
             name: 'Tigo Pesa',
@@ -61,7 +77,8 @@ const PaymentMethod = () => {
             logo: '/images/payments/tigo-logo.png',
             color: '#0066B1',
             icon: <PhoneIcon />,
-            description: 'Quick payment via Tigo Pesa'
+            description: 'Pay with Tigo Pesa via FastLipa',
+            network: 'TIGO'
         },
         {
             name: 'Airtel Money',
@@ -69,7 +86,8 @@ const PaymentMethod = () => {
             logo: '/images/payments/airtel-logo.png',
             color: '#FF0000',
             icon: <PhoneIcon />,
-            description: 'Secure payment with Airtel Money'
+            description: 'Pay with Airtel Money via FastLipa',
+            network: 'AIRTEL'
         },
         {
             name: 'Cash on Delivery',
@@ -82,67 +100,164 @@ const PaymentMethod = () => {
     ];
 
     useEffect(() => {
-        let statusCheckInterval;
-        if (transactionId) {
-            // Check status immediately
-            checkPaymentStatus();
-            // Then check every 5 seconds
-            statusCheckInterval = setInterval(checkPaymentStatus, 5000);
-        }
-        return () => {
-            if (statusCheckInterval) {
-                clearInterval(statusCheckInterval);
+        let statusCheckTimeout;
+
+        const checkPaymentStatus = async () => {
+            if (!transactionId || !order) return;
+            
+            try {
+                const response = await paymentAPI.getFastLipaStatus(transactionId);
+                const status = response.data?.status;
+                
+                setPaymentStatus(status);
+
+                if (status === 'COMPLETED') {
+                    setLoading(false);
+                    dispatch(updateOrderStatus({ id: order._id, status: 'paid' }));
+                    navigate('/orders/' + order._id);
+                } else if (status === 'FAILED') {
+                    setLoading(false);
+                    setError('Payment failed. Please try again.');
+                    setShowPhoneDialog(true);
+                } else if (status === 'PENDING' && transactionId) {
+                    // Continue checking after 5 seconds if still the same transaction
+                    statusCheckTimeout = setTimeout(checkPaymentStatus, 5000);
+                }
+            } catch (err) {
+                console.error('Status Check Error:', err);
+                setError('Error checking payment status. Please contact support if payment was deducted.');
+                setLoading(false);
             }
         };
-    }, [transactionId]);
 
-    const checkPaymentStatus = async () => {
-        try {
-            const response = await paymentAPI.getFastLipaStatus(transactionId);
-            const status = response.data.status;
-            setPaymentStatus(status);
-            
-            if (status === 'COMPLETED') {
-                dispatch(updateOrderStatus({ id: order._id, status: 'paid' }));
-                clearInterval(statusCheckInterval);
-                navigate('/orders/' + order._id);
-            } else if (status === 'FAILED') {
-                setError('Payment failed. Please try again.');
-                setLoading(false);
-                clearInterval(statusCheckInterval);
+        if (transactionId && order) {
+            checkPaymentStatus();
+        }
+
+        return () => {
+            if (statusCheckTimeout) {
+                clearTimeout(statusCheckTimeout);
             }
-        } catch (err) {
-            console.error('Error checking payment status:', err);
-            setError('Error checking payment status. Please contact support.');
+        };
+    }, [transactionId, order, dispatch, navigate]);
+
+
+
+    const validatePhoneNumber = (number) => {
+        // Remove any spaces or special characters
+        const cleanNumber = number.replace(/\s+/g, '');
+        
+        // Check if it starts with 07 (should be 10 digits)
+        if (cleanNumber.startsWith('07')) {
+            return cleanNumber.length === 10;
+        }
+        
+        // Check if it starts with 255 (should be 12 digits)
+        if (cleanNumber.startsWith('255')) {
+            return cleanNumber.length === 12;
+        }
+        
+        return false;
+    };
+
+    const handlePhoneSubmit = async () => {
+        if (!validatePhoneNumber(phoneNumber)) {
+            setPhoneError('Please enter a valid phone number (07XXXXXXXX or 255XXXXXXXXX)');
+            return;
+        }
+
+        if (!order) {
+            setError('No active order found. Please try again.');
             setLoading(false);
+            return;
+        }
+
+        setShowPhoneDialog(false);
+        setPhoneError('');
+        setLoading(true);
+        setError('');
+        
+        try {
+            // Clean and format phone number to international format
+            const cleanNumber = phoneNumber.replace(/\s+/g, '');
+            const formattedPhone = cleanNumber.startsWith('0') 
+                ? '255' + cleanNumber.slice(1) 
+                : cleanNumber;
+            
+            const selectedPayment = paymentMethods.find(m => m.value === selectedMethod);
+            
+            // Initiate FastLipa payment with phone number and network
+            const response = await paymentAPI.createFastLipaOrder(order._id, {
+                phoneNumber: formattedPhone,
+                network: selectedPayment?.network
+            });
+            
+            if (response.data?.transactionId) {
+                setTransactionId(response.data.transactionId);
+                setPaymentStatus('PENDING');
+                // Status check will be handled by the useEffect
+            } else {
+                throw new Error('No transaction ID received');
+            }
+            
+        } catch (err) {
+            console.error('Payment Error:', err);
+            setError(err.response?.data?.message || 'Failed to initiate payment. Please try again.');
+            setLoading(false);
+            setShowPhoneDialog(true); // Show dialog again on error
         }
     };
 
-    const handleMethodSelect = async (method) => {
-        setSelectedMethod(method);
-        localStorage.setItem('paymentMethod', method);
 
-        if (method === 'fastlipa') {
-            try {
-                setLoading(true);
-                setError('');
-                
-                // Initiate FastLipa payment
-                const response = await paymentAPI.createFastLipaOrder(order._id);
-                setTransactionId(response.data.transactionId);
-                setPaymentStatus('PENDING');
-                
-                // Open payment URL if provided
-                if (response.data.paymentUrl) {
-                    window.open(response.data.paymentUrl, '_blank');
-                }
-            } catch (err) {
-                console.error('Error initiating payment:', err);
-                setError('Error initiating payment. Please try again.');
-                setLoading(false);
+
+    const handleMethodSelect = async (method) => {
+        try {
+            setLoading(true);
+            setError('');
+
+            if (!items?.length || !shippingAddress || !userInfo) {
+                setError('Missing cart items or shipping information');
+                navigate('/cart');
+                return;
             }
-        } else {
-            navigate('/checkout/review');
+
+            setSelectedMethod(method);
+            localStorage.setItem('paymentMethod', method);
+
+            const selectedPayment = paymentMethods.find(m => m.value === method);
+            
+            if (selectedPayment?.network) {
+                // For mobile money payments, show phone dialog first
+                setShowPhoneDialog(true);
+            } else if (method === 'cod') {
+                // For cash on delivery, create order directly
+                const orderData = {
+                    orderItems: items.map(item => ({
+                        product: item.product._id,
+                        quantity: item.quantity,
+                        size: item.size,
+                        name: item.product.name,
+                        price: item.product.price,
+                        image: item.product.image
+                    })),
+                    shippingAddress,
+                    paymentMethod: method,
+                    totalPrice: totalAmount,
+                    user: userInfo._id,
+                    isPaid: false
+                };
+
+                const response = await orderAPI.createOrder(orderData);
+                dispatch(setOrder(response.data));
+                dispatch(clearCart());
+                navigate('/checkout/review');
+            }
+            
+        } catch (err) {
+            setError(err.response?.data?.message || 'Failed to process payment method');
+            setSelectedMethod('');
+        } finally {
+            setLoading(false);
         }
     };
 
@@ -313,19 +428,87 @@ const PaymentMethod = () => {
                     <Button
                         variant="outlined"
                         onClick={() => navigate('/checkout/shipping')}
+                        disabled={loading}
                     >
                         Back to Shipping
                     </Button>
                     <Button
                         variant="contained"
                         endIcon={<PaymentIcon />}
-                        disabled={!selectedMethod}
-                        onClick={() => navigate('/checkout/review')}
+                        disabled={!selectedMethod || loading || (paymentStatus === 'pending')}
+                        onClick={() => {
+                            if (selectedMethod === 'cod') {
+                                handleMethodSelect('cod');
+                            } else {
+                                setError('Please complete the payment process first');
+                            }
+                        }}
                     >
-                        Continue to Review
+                        {loading ? (
+                            <CircularProgress size={24} color="inherit" />
+                        ) : paymentStatus === 'pending' ? (
+                            'Payment Processing...'
+                        ) : (
+                            'Continue to Review'
+                        )}
                     </Button>
                 </Box>
             </Paper>
+
+            {/* Phone Number Input Dialog */}
+            <Dialog open={showPhoneDialog} onClose={() => setShowPhoneDialog(false)}>
+                <DialogTitle>Enter Phone Number</DialogTitle>
+                <DialogContent>
+                    <Typography variant="body2" color="text.secondary" sx={{ mb: 2 }}>
+                        Please enter the phone number you want to use for payment with {
+                            paymentMethods.find(m => m.value === selectedMethod)?.name
+                        }
+                    </Typography>
+                    <Box sx={{ mb: 2 }}>
+                        <Typography variant="body2" color="text.secondary" sx={{ mb: 1 }}>
+                            Enter your phone number in one of these formats:
+                            <br/>• Starting with 07 (10 digits total): 0712345678
+                            <br/>• Starting with 255 (12 digits total): 255712345678
+                        </Typography>
+                    </Box>
+                    <TextField
+                        autoFocus
+                        margin="dense"
+                        label="Phone Number"
+                        type="tel"
+                        fullWidth
+                        variant="outlined"
+                        value={phoneNumber}
+                        onChange={(e) => {
+                            // Only allow digits
+                            const cleaned = e.target.value.replace(/[^\d]/g, '');
+                            setPhoneNumber(cleaned);
+                        }}
+                        error={!!phoneError}
+                        helperText={phoneError}
+                        placeholder="e.g., 0712345678"
+                        InputProps={{
+                            inputMode: 'numeric',
+                            pattern: '[0-9]*'
+                        }}
+                    />
+                </DialogContent>
+                <DialogActions>
+                    <Button onClick={() => {
+                        setShowPhoneDialog(false);
+                        setSelectedMethod('');
+                    }}>
+                        Cancel
+                    </Button>
+                    <Button 
+                        onClick={handlePhoneSubmit} 
+                        variant="contained"
+                        disabled={!phoneNumber}
+                    >
+                        Continue
+                    </Button>
+                </DialogActions>
+            </Dialog>
         </Box>
     );
 };

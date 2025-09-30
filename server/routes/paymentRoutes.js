@@ -2,11 +2,14 @@ const express = require('express');
 const router = express.Router();
 const { protect } = require('../middleware/authMiddleware');
 const { 
-    createZenoPayOrder,
-    handleZenoPayCallback
+    createFastLipaOrder,
+    getFastLipaTransactionStatus
 } = require('../controllers/paymentController');
 
-router.post('/zenopay/:orderId', protect, createZenoPayOrder);
-router.post('/zenopay/callback', handleZenoPayCallback);
+// Create a FastLipa transaction for an order
+router.post('/fastlipa/:orderId', protect, createFastLipaOrder);
+
+// Poll FastLipa transaction status
+router.get('/fastlipa/status', getFastLipaTransactionStatus);
 
 module.exports = router; 

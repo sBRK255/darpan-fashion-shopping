@@ -1,0 +1,120 @@
+
+
+Retrieve authenticated user's account information including current balance and account details.
+Code Examples
+
+const https = require('https');
+
+const options = {
+  hostname: 'https://api.fastlipa.com'.replace('https://', ''),
+  path: '/api/balance',
+  method: 'GET',
+  headers: {
+    'Authorization': 'Bearer YOUR_API_TOKEN'
+  }
+};
+
+const req = https.request(options, res => {
+  let data = '';
+  res.on('data', chunk => data += chunk);
+  res.on('end', () => console.log(JSON.parse(data)));
+});
+
+req.end();
+
+
+
+Initiate a new payment transaction to the specified recipient.
+Body Parameters
+Parameter 	Type 	Required 	Description
+number 	String 	Yes 	Recipient's phone number
+amount 	Integer 	Yes 	Amount to transfer (in smallest currency unit)
+name 	String 	Yes 	Recipient's full name
+Code Examples
+
+const https = require('https');
+
+const data = JSON.stringify({
+  number: "0695123456",
+  amount: 5000,
+  name: "John Doe"
+});
+
+const options = {
+  hostname: 'https://api.fastlipa.com'.replace('https://', ''),
+  path: '/api/create-transaction',
+  method: 'POST',
+  headers: {
+    'Authorization': 'Bearer YOUR_API_TOKEN',
+    'Content-Type': 'application/json',
+    'Content-Length': data.length
+  }
+};
+
+const req = https.request(options, res => {
+  let data = '';
+  res.on('data', chunk => data += chunk);
+  res.on('end', () => console.log(JSON.parse(data)));
+});
+
+req.write(data);
+req.end();
+
+
+3 Check Transaction Status
+GET /api/status-transaction
+
+Check the current status of a specific transaction using its unique identifier.
+Query Parameters
+Parameter 	Type 	Required 	Description
+tranid 	String 	Yes 	Transaction ID (e.g., pay_jskd93ks)
+Code Examples
+
+const https = require('https');
+
+const options = {
+  hostname: 'https://api.fastlipa.com'.replace('https://', ''),
+  path: '/api/status-transaction?tranid=pay_jskd93ks',
+  method: 'GET',
+  headers: {
+    'Authorization': 'Bearer YOUR_API_TOKEN'
+  }
+};
+
+const req = https.request(options, res => {
+  let data = '';
+  res.on('data', chunk => data += chunk);
+  res.on('end', () => console.log(JSON.parse(data)));
+});
+
+req.end();
+
+4 List Transactions
+GET /api/list-transaction
+
+Retrieve a list of transactions within a specified date range.
+Query Parameters
+Parameter 	Type 	Required 	Description
+date_from 	String 	Yes 	Start date (YYYY-MM-DD format)
+date_to 	String 	Yes 	End date (YYYY-MM-DD format)
+Code Examples
+
+const https = require('https');
+
+const options = {
+  hostname: 'https://api.fastlipa.com'.replace('https://', ''),
+  path: '/api/list-transaction?date_from=2025-09-01&date_to=2025-09-05',
+  method: 'GET',
+  headers: {
+    'Authorization': 'Bearer YOUR_API_TOKEN'
+  }
+};
+
+const req = https.request(options, res => {
+  let data = '';
+  res.on('data', chunk => data += chunk);
+  res.on('end', () => console.log(JSON.parse(data)));
+});
+
+req.end();
+

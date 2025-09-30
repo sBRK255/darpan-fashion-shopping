@@ -86,12 +86,14 @@ export const orderAPI = {
 };
 
 export const paymentAPI = {
-    createFastLipaOrder: (orderId) => api.post(`/payments/fastlipa/${orderId}`),
-    // Backwards-compatible alias for older code that called createZenoPayOrder
-    createZenoPayOrder: (orderId) => api.post(`/payments/fastlipa/${orderId}`),
-    createPesapalOrder: (orderId) => api.post(`/payments/pesapal/${orderId}`),
+    initiatePayment: ({ orderId, amount, phoneNumber, network }) => 
+        api.post(`/payments/fastlipa/${orderId}`, { amount, phoneNumber, network }),
     // Poll transaction status
-    getFastLipaStatus: (tranid) => api.get(`/payments/fastlipa/status?tranid=${tranid}`),
+    checkPaymentStatus: (transactionId) => 
+        api.get(`/payments/fastlipa/status/${transactionId}`),
+    // Legacy methods for backwards compatibility
+    createFastLipaOrder: (orderId, paymentDetails = {}) => 
+        api.post(`/payments/fastlipa/${orderId}`, paymentDetails),
 };
 
 export default api; 
